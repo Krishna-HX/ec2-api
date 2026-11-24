@@ -109,6 +109,24 @@ messages = [
     }
 ]
 
+def execute_tool(name: str, raw_arguments: str) -> str:
+    try:
+        arguments = json.loads(raw_arguments)
+
+        if not isinstance(arguments, dict):
+            raise ValueError("Arguments must be a JSON object")
+
+        function = available_functions.get(name)
+
+        if function is None:
+            raise ValueError(f"Unknown tool: {name}")
+
+        result = function(**arguments)
+        return str(result)
+
+    except (ValueError, TypeError) as error:
+        return json.dumps({"error": str(error)})
+
 
 # 5. Automatic tool-calling loop
 
@@ -142,25 +160,13 @@ for iteration in range(1, MAX_ROUNDS + 1):
         name = tool_call.function.name
         print("Requested Tool:", name)
 
-        try:
-            arguments = json.loads(
-                tool_call.function.arguments
-            )
+        content = execute_tool(
+            name,
+            tool_call.function.arguments
+        )
 
-            function = available_functions.get(name)
-
-            if function is None:
-                raise ValueError("Unknown tool")
-
-            result = function(**arguments)
-            content = str(result)
-
-            print("Arguments:", arguments)
-            print("Tool Result:", result)
-
-        except (ValueError, TypeError, KeyError) as error:
-            content = json.dumps({"error": str(error)})
-            print("Tool Error:", content)
+        print("Tool:", name)
+        print("Result:", content)
 
         # Return tool result to conversation
         messages.append({
@@ -170,7 +176,7 @@ for iteration in range(1, MAX_ROUNDS + 1):
             "content": content
         })
 
-        print(messages)
+        # print("messages:", messages)
 
 else:
     print("Stopped: maximum LLM rounds reached.")
